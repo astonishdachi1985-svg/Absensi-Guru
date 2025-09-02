@@ -1,0 +1,159 @@
+
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Aplikasi Absensi Guru Online</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; background: #f9f9f9; }
+    .container { max-width: 600px; margin: auto; background: #fff; padding: 20px; border-radius: 10px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+    h1, h2 { text-align: center; }
+    label { display: block; margin-top: 10px; }
+    select, input, button { width: 100%; padding: 10px; margin-top: 5px; border-radius: 5px; border: 1px solid #ccc; }
+    button { background: #4CAF50; color: white; border: none; cursor: pointer; }
+    button:hover { background: #45a049; }
+    .hidden { display: none; }
+    .menu { margin-top: 20px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+    th, td { border: 1px solid #ddd; padding: 8px; text-align: center; }
+    th { background: #4CAF50; color: white; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>📚 Absensi Guru Online</h1>
+    <div id="roleSelection">
+      <button onclick="selectRole('admin')">Masuk sebagai Admin</button>
+      <button onclick="selectRole('guru')">Masuk sebagai Guru</button>
+    </div>
+
+    <!-- Login Admin -->
+    <div id="adminLogin" class="hidden">
+      <h2>🔑 Login Admin</h2>
+      <input type="password" id="adminPassword" placeholder="Masukkan password admin">
+      <button onclick="loginAdmin()">Login</button>
+    </div>
+
+    <!-- Panel Admin -->
+    <div id="adminPanel" class="hidden">
+      <h2>📋 Panel Admin</h2>
+      <div class="menu">
+        <h3>Tambah Guru</h3>
+        <input type="text" id="guruName" placeholder="Nama Guru">
+        <input type="text" id="guruPin" placeholder="PIN Guru (contoh: 1234)">
+        <button onclick="addGuru()">Tambah Guru</button>
+        <table id="guruTable">
+          <tr><th>Nama Guru</th><th>PIN</th></tr>
+        </table>
+      </div>
+      <div class="menu">
+        <h3>Buat Sesi Absensi</h3>
+        <input type="text" id="sesiName" placeholder="Nama Sesi (contoh: Absensi 02-09-2025)">
+        <button onclick="addSesi()">Buat Sesi</button>
+        <table id="sesiTable">
+          <tr><th>Nama Sesi</th></tr>
+        </table>
+      </div>
+      <div class="menu">
+        <h3>Ekspor / Impor Data</h3>
+        <button onclick="exportData()">Ekspor Data (.json)</button>
+        <input type="file" id="importFile" onchange="importData(event)">
+      </div>
+    </div>
+
+    <!-- Panel Guru -->
+    <div id="guruPanel" class="hidden">
+      <h2>👩‍🏫 Absensi Guru</h2>
+      <label for="sesiSelect">Pilih Sesi:</label>
+      <select id="sesiSelect"></select>
+
+      <label for="guruSelect">Pilih Nama Guru:</label>
+      <select id="guruSelect"></select>
+
+      <label for="guruPinInput">Masukkan PIN:</label>
+      <input type="password" id="guruPinInput" placeholder="PIN">
+
+      <button onclick="absen('in')">Check-In</button>
+      <button onclick="absen('out')">Check-Out</button>
+
+      <h3>Riwayat Absensi</h3>
+      <table id="absensiTable">
+        <tr><th>Nama</th><th>Sesi</th><th>Status</th><th>Waktu</th></tr>
+      </table>
+    </div>
+  </div>
+
+  <script>
+    let data = JSON.parse(localStorage.getItem("absensiData")) || {adminPass:"12345",gurus:[],sesi:[],absensi:[]};
+
+    function saveData(){ localStorage.setItem("absensiData", JSON.stringify(data)); }
+
+    function selectRole(role){
+      document.getElementById("roleSelection").classList.add("hidden");
+      if(role==="admin"){ document.getElementById("adminLogin").classList.remove("hidden"); }
+      else{ document.getElementById("guruPanel").classList.remove("hidden"); refreshGuruSesi(); refreshAbsensi(); }
+    }
+
+    function loginAdmin(){
+      let pass=document.getElementById("adminPassword").value;
+      if(pass===data.adminPass){ document.getElementById("adminLogin").classList.add("hidden"); document.getElementById("adminPanel").classList.remove("hidden"); refreshGuru(); refreshSesi(); }
+      else{ alert("Password salah!"); }
+    }
+
+    function addGuru(){
+      let nama=document.getElementById("guruName").value;
+      let pin=document.getElementById("guruPin").value;
+      if(nama && pin){ data.gurus.push({nama,pin}); saveData(); refreshGuru(); }
+    }
+
+    function refreshGuru(){
+      let table=document.getElementById("guruTable"); table.innerHTML="<tr><th>Nama Guru</th><th>PIN</th></tr>";
+      data.gurus.forEach(g=>{ table.innerHTML+=`<tr><td>${g.nama}</td><td>${g.pin}</td></tr>`; });
+    }
+
+    function addSesi(){
+      let sesi=document.getElementById("sesiName").value;
+      if(sesi){ data.sesi.push(sesi); saveData(); refreshSesi(); }
+    }
+
+    function refreshSesi(){
+      let table=document.getElementById("sesiTable"); table.innerHTML="<tr><th>Nama Sesi</th></tr>";
+      data.sesi.forEach(s=>{ table.innerHTML+=`<tr><td>${s}</td></tr>`; });
+    }
+
+    function refreshGuruSesi(){
+      let guruSelect=document.getElementById("guruSelect"); guruSelect.innerHTML="";
+      data.gurus.forEach(g=>{ guruSelect.innerHTML+=`<option>${g.nama}</option>`; });
+      let sesiSelect=document.getElementById("sesiSelect"); sesiSelect.innerHTML="";
+      data.sesi.forEach(s=>{ sesiSelect.innerHTML+=`<option>${s}</option>`; });
+    }
+
+    function absen(type){
+      let nama=document.getElementById("guruSelect").value;
+      let sesi=document.getElementById("sesiSelect").value;
+      let pin=document.getElementById("guruPinInput").value;
+      let guru=data.gurus.find(g=>g.nama===nama && g.pin===pin);
+      if(guru){ let waktu=new Date().toLocaleString(); data.absensi.push({nama,sesi,type,waktu}); saveData(); refreshAbsensi(); alert("Absensi berhasil!"); }
+      else{ alert("PIN salah!"); }
+    }
+
+    function refreshAbsensi(){
+      let table=document.getElementById("absensiTable"); table.innerHTML="<tr><th>Nama</th><th>Sesi</th><th>Status</th><th>Waktu</th></tr>";
+      data.absensi.forEach(a=>{ table.innerHTML+=`<tr><td>${a.nama}</td><td>${a.sesi}</td><td>${a.type}</td><td>${a.waktu}</td></tr>`; });
+    }
+
+    function exportData(){
+      let blob=new Blob([JSON.stringify(data)],{type:"application/json"});
+      let a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download="absensiData.json"; a.click();
+    }
+
+    function importData(event){
+      let file=event.target.files[0];
+      let reader=new FileReader();
+      reader.onload=function(e){ data=JSON.parse(e.target.result); saveData(); refreshGuru(); refreshSesi(); refreshGuruSesi(); refreshAbsensi(); alert("Data berhasil diimpor!"); };
+      reader.readAsText(file);
+    }
+  </script>
+</body>
+</html>
